@@ -1,0 +1,6 @@
+{
+  "name": "Opportunity Radar",
+  "description": "AI agent and web app (PWA) to discover, match, score, and track internships, jobs, gigs, tenders, and collaborations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
