@@ -7,6 +7,7 @@ from app.models.match import Match, MatchStatus
 from app.models.application import Application, ApplicationStage
 from app.models.notification import Notification
 from app.models.push_subscription import PushSubscription
+from app.models.ingestion_run import IngestionRun
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "ApplicationStage",
     "Notification",
     "PushSubscription",
+    "IngestionRun",
 ]

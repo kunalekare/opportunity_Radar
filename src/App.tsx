@@ -4,13 +4,14 @@ import { Navbar } from './components/Navbar';
 import { AuthPage } from './pages/AuthPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { SourcesPage } from './pages/SourcesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
   const { user, profile, isLoading } = useAuth();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'profile' | 'onboarding'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'profile' | 'sources' | 'onboarding'>('dashboard');
 
   if (isLoading) {
     return (
@@ -51,19 +52,24 @@ function AppContent() {
     );
   }
 
-  // Main Dashboard / Profile view
+  // Main Dashboard / Sources / Profile view
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-cyan-500 selection:text-slate-950">
       <Navbar currentView={currentView} setCurrentView={setCurrentView} />
       <main className="flex-1">
         {currentView === 'dashboard' ? (
-          <DashboardPage onGoToProfile={() => setCurrentView('profile')} />
+          <DashboardPage
+            onGoToProfile={() => setCurrentView('profile')}
+            onGoToSources={() => setCurrentView('sources')}
+          />
+        ) : currentView === 'sources' ? (
+          <SourcesPage />
         ) : (
           <ProfilePage />
         )}
       </main>
       <footer className="py-5 text-center text-[11px] text-slate-500 border-t border-slate-900 max-w-7xl mx-auto w-full px-4">
-        Opportunity Radar PWA • Phase 1 Foundation Active • Ready for Phase 2 Source Adapters
+        Opportunity Radar PWA • Phase 2 Ingestion Pipeline Active • Scheduled Feeds & Source Adapters
       </footer>
       <OfflineIndicator />
     </div>

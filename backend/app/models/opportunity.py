@@ -47,6 +47,12 @@ class Opportunity(Base):
     raw: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     
+    # Deduplication & status fields
+    duplicate_of_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("opportunities.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False, index=True)
+    
     embedding = mapped_column(get_vector_type(1536), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -55,9 +61,11 @@ class Opportunity(Base):
         UniqueConstraint("source_id", "external_id", name="uq_source_external_id"),
         Index("idx_opportunity_content_hash", "content_hash"),
         Index("idx_opportunity_type_posted", "type", "posted_at"),
+        Index("idx_opportunity_status", "status"),
     )
 
     # Relationships
     source = relationship("Source", back_populates="opportunities")
     matches = relationship("Match", back_populates="opportunity", cascade="all, delete-orphan")
     applications = relationship("Application", back_populates="opportunity", cascade="all, delete-orphan")
+    duplicates = relationship("Opportunity", backref="duplicate_of", remote_side=[id])

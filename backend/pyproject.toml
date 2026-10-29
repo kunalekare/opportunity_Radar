@@ -19,6 +19,11 @@ dependencies = [
     "anthropic>=0.21.3",
     "pypdf>=4.1.0",
     "httpx>=0.27.0",
+    "apscheduler>=3.10.4",
+    "rapidfuzz>=3.6.0",
+    "feedparser>=6.0.11",
+    "beautifulsoup4>=4.12.3",
+    "html2text>=2024.2.26",
 ]
 
 [tool.pytest.ini_options]

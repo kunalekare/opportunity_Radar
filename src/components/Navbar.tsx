@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Radar, User as UserIcon, LogOut, Compass, FileCheck } from 'lucide-react';
+import { Radar, User as UserIcon, LogOut, Compass, FileCheck, Layers } from 'lucide-react';
 
 interface NavbarProps {
-  currentView: 'dashboard' | 'profile' | 'onboarding';
-  setCurrentView: (view: 'dashboard' | 'profile' | 'onboarding') => void;
+  currentView: 'dashboard' | 'profile' | 'sources' | 'onboarding';
+  setCurrentView: (view: 'dashboard' | 'profile' | 'sources' | 'onboarding') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) => {
@@ -47,6 +47,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
             >
               <Compass className="w-3.5 h-3.5" />
               <span>Radar Feed</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentView('sources')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                currentView === 'sources'
+                  ? 'bg-slate-800 text-cyan-400 border border-slate-700'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Sources</span>
             </button>
 
             <button

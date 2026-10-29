@@ -56,6 +56,32 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str | None = None
     CLAUDE_MODEL: str = "claude-sonnet-5-5"
 
+    # Ingestion & Scheduler Config
+    DEMO_MODE: bool = False
+    MAX_OPPORTUNITY_AGE_DAYS: int = 45
+    DEFAULT_INGESTION_INTERVAL_HOURS: int = 3
+    USER_AGENT: str = "OpportunityRadar/1.0 (+https://opportunityradar.app/bot; contact@opportunityradar.app)"
+
+    # Adapter API Credentials
+    ADZUNA_APP_ID: str | None = None
+    ADZUNA_APP_KEY: str | None = None
+    ADZUNA_COUNTRY: str = "in"  # Support India, us, gb, etc.
+    GITHUB_TOKEN: str | None = None
+    REDDIT_CLIENT_ID: str | None = None
+    REDDIT_CLIENT_SECRET: str | None = None
+    REDDIT_USER_AGENT: str = "OpportunityRadar:v1.0 (by /u/opportunityradar)"
+    
+    # Email IMAP Adapter Credentials
+    IMAP_SERVER: str | None = None
+    IMAP_PORT: int = 993
+    IMAP_USER: str | None = None
+    IMAP_PASSWORD: str | None = None
+    IMAP_FOLDER: str = "INBOX"
+
+    # Embeddings Provider (Pluggable)
+    EMBEDDING_PROVIDER: str = "mock"  # mock, local, openai, gemini, voyagae
+    EMBEDDING_API_KEY: str | None = None
+
     # Notification & Push credentials (Phase 1 placeholders ready for Phase 2/3)
     VAPID_PUBLIC_KEY: str | None = None
     VAPID_PRIVATE_KEY: str | None = None

@@ -4,8 +4,9 @@ import {
   ExtractedResumeData,
   Opportunity,
   Match,
-  Application,
-  NotificationItem,
+  SourceItem,
+  IngestionRunItem,
+  OpportunityPaginated,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -45,7 +46,6 @@ class ApiClient {
     return headers;
   }
 
-  // Generic request with fallback to local mock storage if backend is unreachable
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -70,7 +70,6 @@ class ApiClient {
 
       return (await response.json()) as T;
     } catch (err: any) {
-      // If network unreachable and fallback provided, run simulated local backend
       if (
         (err.message.includes('Failed to fetch') ||
           err.message.includes('NetworkError') ||
@@ -93,7 +92,6 @@ class ApiClient {
         body: JSON.stringify({ email, password }),
       },
       async () => {
-        // Fallback simulated registration
         const users = JSON.parse(localStorage.getItem('sim_users') || '[]');
         if (users.find((u: any) => u.email === email.toLowerCase())) {
           throw new Error('A user with this email address already exists.');
@@ -125,7 +123,6 @@ class ApiClient {
         const users = JSON.parse(localStorage.getItem('sim_users') || '[]');
         let user = users.find((u: any) => u.email === email.toLowerCase());
         
-        // Demo default account if not registered yet
         if (!user && (email === 'demo@opportunityradar.app' || email.includes('example.com') || email.includes('@'))) {
           user = {
             id: 'usr_demo_123',
@@ -236,9 +233,8 @@ class ApiClient {
         body: formData,
       },
       async () => {
-        // High fidelity simulated Claude resume parser
         const textToAnalyze = rawText || (file ? `Resume document: ${file.name}` : '');
-        return this.simulateClaudeResumeParser(textToAnalyze, file?.name);
+        return this.simulateClaudeResumeParser(textToAnalyze);
       }
     );
   }
@@ -256,151 +252,477 @@ class ApiClient {
     );
   }
 
-  // --- Seeded Opportunities (Phase 1 preview) ---
-  async getRadarOpportunities(): Promise<{ matches: Match[]; opportunities: Opportunity[] }> {
-    const profile = JSON.parse(localStorage.getItem('sim_profile') || 'null');
-    const threshold = profile?.match_threshold || 70;
-
-    const sampleOpportunities: Opportunity[] = [
-      {
-        id: 'opp_1',
-        source_id: 'src_anthropic',
-        external_id: 'anthropic_intern_2026',
-        type: 'internship',
-        title: 'AI Systems Engineering Intern (Fall/Spring)',
-        org: 'Anthropic',
-        description: 'Work with the frontier alignment and developer platform team. Build scalable evaluations, tools, and integrations for Claude SDK and agent frameworks.',
-        skills: ['Python', 'FastAPI', 'PyTorch', 'Distributed Systems'],
-        location: 'San Francisco, CA',
-        remote: true,
-        pay_min: 50,
-        pay_max: 65,
-        currency: 'USD/hr',
-        deadline: new Date(Date.now() + 86400000 * 14).toISOString(),
-        posted_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-        url: 'https://anthropic.com/careers',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'opp_2',
-        source_id: 'src_upwork',
-        external_id: 'upwork_gig_rag_fastapi',
-        type: 'freelance',
-        title: 'Full-Stack Developer: FastAPI + React AI Agent Platform',
-        org: 'Stealth AI Venture',
-        description: 'Looking for a senior full-stack engineer to build an automated research radar with pgvector embeddings, APScheduler background jobs, and a clean mobile-ready PWA.',
-        skills: ['FastAPI', 'React', 'TypeScript', 'PostgreSQL', 'Docker'],
-        location: 'Global',
-        remote: true,
-        pay_min: 6500,
-        pay_max: 11000,
-        currency: 'USD',
-        deadline: new Date(Date.now() + 86400000 * 7).toISOString(),
-        posted_at: new Date(Date.now() - 86400000 * 1).toISOString(),
-        url: 'https://upwork.com',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'opp_3',
-        source_id: 'src_github',
-        external_id: 'gh_hackathon_agentic',
-        type: 'collaboration',
-        title: 'Co-builder / Technical Lead: Agentic Workflow Hackathon',
-        org: 'Autonomous Agents Lab',
-        description: 'Teaming up for the Global Autonomous Agents Hackathon. Seeking an experienced backend and frontend engineer proficient in Python and React.',
-        skills: ['Python', 'TypeScript', 'LLM Agents', 'TailwindCSS'],
-        location: 'Remote',
-        remote: true,
-        pay_min: 25000,
-        pay_max: 50000,
-        currency: 'USD Prize',
-        deadline: new Date(Date.now() + 86400000 * 21).toISOString(),
-        posted_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-        url: 'https://github.com',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'opp_4',
-        source_id: 'src_yc',
-        external_id: 'yc_cofounder_ai_platform',
-        type: 'deal',
-        title: 'Technical Co-Founder / Founding Engineer (Equity + Salary)',
-        org: 'RadarMind (YC W26)',
-        description: 'Building autonomous opportunity sourcing and tender scanning for enterprises. $2M pre-seed raised.',
-        skills: ['FastAPI', 'PostgreSQL', 'pgvector', 'React', 'Claude API'],
-        location: 'New York / Remote',
-        remote: true,
-        pay_min: 140000,
-        pay_max: 190000,
-        currency: 'USD/yr',
-        deadline: new Date(Date.now() + 86400000 * 30).toISOString(),
-        posted_at: new Date(Date.now() - 86400000 * 4).toISOString(),
-        url: 'https://ycombinator.com/jobs',
-        created_at: new Date().toISOString(),
-      },
-    ];
-
-    const sampleMatches: Match[] = sampleOpportunities.map((opp, idx) => {
-      const scores = [94, 88, 85, 78];
-      const reasons = [
-        "High affinity with your Python & AI agent background. Meets remote preference and exceeds minimum stipend.",
-        "Matches 4/5 of your primary skills (FastAPI, React, PostgreSQL, Docker) with verified budget.",
-        "Strong synergy with your open-source projects and collaboration preferences.",
-        "Founding engineer scope aligning with full-stack capability and high score threshold.",
-      ];
-      return {
-        id: 'match_' + (idx + 1),
-        user_id: profile?.user_id || 'usr_demo',
-        opportunity_id: opp.id,
-        score: scores[idx],
-        reason: reasons[idx],
-        red_flags: idx === 3 ? ['Requires intensive startup commitment (~55 hrs/wk)'] : [],
-        status: 'new' as const,
-        created_at: new Date().toISOString(),
-        opportunity: opp,
-      };
-    }).filter(m => m.score >= threshold);
-
-    return { matches: sampleMatches, opportunities: sampleOpportunities };
+  // --- Phase 2: Ingestion & Sources APIs ---
+  async getSources(): Promise<SourceItem[]> {
+    return this.request(
+      '/sources',
+      { method: 'GET' },
+      async () => {
+        const saved = localStorage.getItem('sim_sources');
+        if (saved) return JSON.parse(saved);
+        const defaults: SourceItem[] = [
+          {
+            id: 'src_mock',
+            name: 'mock',
+            type: 'mock',
+            enabled: true,
+            interval_hours: 3,
+            config: { description: 'Local test fixtures' },
+            last_run_at: new Date().toISOString(),
+            needs_config: false,
+            missing_env_keys: [],
+          },
+          {
+            id: 'src_remotive',
+            name: 'remotive',
+            type: 'api',
+            enabled: true,
+            interval_hours: 3,
+            config: { api_url: 'https://remotive.com/api/remote-jobs?limit=30' },
+            last_run_at: new Date(Date.now() - 3600000).toISOString(),
+            needs_config: false,
+            missing_env_keys: [],
+          },
+          {
+            id: 'src_remoteok',
+            name: 'remoteok',
+            type: 'api',
+            enabled: true,
+            interval_hours: 3,
+            config: { api_url: 'https://remoteok.com/api' },
+            last_run_at: new Date(Date.now() - 7200000).toISOString(),
+            needs_config: false,
+            missing_env_keys: [],
+          },
+          {
+            id: 'src_rss',
+            name: 'rss_general',
+            type: 'rss',
+            enabled: true,
+            interval_hours: 3,
+            config: { feed_urls: ['https://weworkremotely.com/categories/remote-programming-jobs.rss'] },
+            last_run_at: new Date(Date.now() - 10800000).toISOString(),
+            needs_config: false,
+            missing_env_keys: [],
+          },
+          {
+            id: 'src_hn',
+            name: 'hackernews',
+            type: 'api',
+            enabled: true,
+            interval_hours: 6,
+            config: { description: 'Hacker News Who is hiring' },
+            needs_config: false,
+            missing_env_keys: [],
+          },
+          {
+            id: 'src_github',
+            name: 'github',
+            type: 'api',
+            enabled: true,
+            interval_hours: 6,
+            config: { query: 'label:"good first issue"' },
+            needs_config: false,
+            missing_env_keys: ['GITHUB_TOKEN (Recommended for higher rate limit)'],
+          },
+          {
+            id: 'src_adzuna',
+            name: 'adzuna',
+            type: 'api',
+            enabled: false,
+            interval_hours: 6,
+            config: { country: 'in' },
+            needs_config: true,
+            missing_env_keys: ['ADZUNA_APP_ID', 'ADZUNA_APP_KEY'],
+          },
+          {
+            id: 'src_email',
+            name: 'email_alert',
+            type: 'email',
+            enabled: false,
+            interval_hours: 1,
+            config: { folder: 'INBOX' },
+            needs_config: true,
+            missing_env_keys: ['IMAP_SERVER', 'IMAP_USER', 'IMAP_PASSWORD'],
+          },
+        ];
+        localStorage.setItem('sim_sources', JSON.stringify(defaults));
+        return defaults;
+      }
+    );
   }
 
-  private simulateClaudeResumeParser(text: string, filename?: string): ExtractedResumeData {
-    // Detect keywords in text or provide sensible defaults
+  async updateSource(id: string, payload: Partial<SourceItem>): Promise<SourceItem> {
+    return this.request(
+      `/sources/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+      async () => {
+        const sources: SourceItem[] = await this.getSources();
+        const idx = sources.findIndex((s) => s.id === id);
+        if (idx !== -1) {
+          sources[idx] = { ...sources[idx], ...payload };
+          localStorage.setItem('sim_sources', JSON.stringify(sources));
+          return sources[idx];
+        }
+        throw new Error('Source not found');
+      }
+    );
+  }
+
+  async runSource(id: string): Promise<IngestionRunItem> {
+    return this.request(
+      `/sources/${id}/run`,
+      { method: 'POST' },
+      async () => {
+        const sources: SourceItem[] = await this.getSources();
+        const src = sources.find((s) => s.id === id);
+        const run: IngestionRunItem = {
+          id: 'run_' + Math.random().toString(36).substring(2, 9),
+          source_id: id,
+          source_name: src?.name || 'source',
+          status: 'success',
+          started_at: new Date().toISOString(),
+          finished_at: new Date().toISOString(),
+          fetched: 12,
+          new: 4,
+          duplicates: 8,
+          errors: [],
+          tokens_used: 180,
+        };
+        const runs = JSON.parse(localStorage.getItem('sim_ingestion_runs') || '[]');
+        runs.unshift(run);
+        localStorage.setItem('sim_ingestion_runs', JSON.stringify(runs));
+        return run;
+      }
+    );
+  }
+
+  async runAllSources(): Promise<IngestionRunItem[]> {
+    return this.request(
+      '/ingestion/run-all',
+      { method: 'POST' },
+      async () => {
+        const sources: SourceItem[] = await this.getSources();
+        const runs: IngestionRunItem[] = [];
+        for (const s of sources.filter((x) => x.enabled)) {
+          runs.push({
+            id: 'run_' + Math.random().toString(36).substring(2, 9),
+            source_id: s.id,
+            source_name: s.name,
+            status: s.needs_config ? 'partial' : 'success',
+            started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
+            fetched: s.needs_config ? 0 : 15,
+            new: s.needs_config ? 0 : 5,
+            duplicates: s.needs_config ? 0 : 10,
+            errors: s.needs_config ? ['Needs credentials'] : [],
+            tokens_used: s.needs_config ? 0 : 210,
+          });
+        }
+        localStorage.setItem('sim_ingestion_runs', JSON.stringify(runs));
+        return runs;
+      }
+    );
+  }
+
+  async getIngestionRuns(): Promise<IngestionRunItem[]> {
+    return this.request(
+      '/ingestion/runs',
+      { method: 'GET' },
+      async () => {
+        const stored = localStorage.getItem('sim_ingestion_runs');
+        if (stored) return JSON.parse(stored);
+        return [
+          {
+            id: 'run_init_1',
+            source_id: 'src_remotive',
+            source_name: 'remotive',
+            status: 'success',
+            started_at: new Date(Date.now() - 3600000).toISOString(),
+            finished_at: new Date(Date.now() - 3590000).toISOString(),
+            fetched: 25,
+            new: 7,
+            duplicates: 18,
+            errors: [],
+            tokens_used: 120,
+          },
+          {
+            id: 'run_init_2',
+            source_id: 'src_mock',
+            source_name: 'mock',
+            status: 'success',
+            started_at: new Date(Date.now() - 7200000).toISOString(),
+            finished_at: new Date(Date.now() - 7195000).toISOString(),
+            fetched: 4,
+            new: 4,
+            duplicates: 0,
+            errors: [],
+            tokens_used: 0,
+          },
+        ];
+      }
+    );
+  }
+
+  // --- Real Opportunities APIs ---
+  async getOpportunities(params: {
+    page?: number;
+    page_size?: number;
+    type?: string;
+    remote?: boolean;
+    source_id?: string;
+    search?: string;
+  } = {}): Promise<OpportunityPaginated> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', params.page.toString());
+    if (params.page_size) query.set('page_size', params.page_size.toString());
+    if (params.type && params.type !== 'all') query.set('type', params.type);
+    if (params.remote !== undefined) query.set('remote', params.remote.toString());
+    if (params.source_id) query.set('source_id', params.source_id);
+    if (params.search) query.set('search', params.search);
+
+    return this.request(
+      `/opportunities?${query.toString()}`,
+      { method: 'GET' },
+      async () => {
+        // Fallback seeded dataset with source badges
+        const allOpps: Opportunity[] = this.getSeededOpportunities();
+        let filtered = allOpps;
+        if (params.type && params.type !== 'all') {
+          filtered = filtered.filter((o) => o.type === params.type);
+        }
+        if (params.search) {
+          const s = params.search.toLowerCase();
+          filtered = filtered.filter(
+            (o) =>
+              o.title.toLowerCase().includes(s) ||
+              o.org.toLowerCase().includes(s) ||
+              o.description.toLowerCase().includes(s)
+          );
+        }
+        return {
+          items: filtered,
+          total: filtered.length,
+          page: params.page || 1,
+          page_size: params.page_size || 20,
+          total_pages: 1,
+        };
+      }
+    );
+  }
+
+  async createOpportunityFromUrl(url: string): Promise<Opportunity> {
+    return this.request(
+      '/opportunities/from-url',
+      {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+      },
+      async () => {
+        const newOpp: Opportunity = {
+          id: 'opp_' + Math.random().toString(36).substring(2, 9),
+          source_id: 'src_manual',
+          source_name: 'Manual URL',
+          external_id: 'url_' + Date.now(),
+          type: 'job',
+          title: 'Full-Stack Software Engineer (Imported from URL)',
+          org: 'Verified Tech Organization',
+          description: `Imported publicly from ${url}. Automated normalization by Claude extracted key requirements and skills.`,
+          skills: ['Python', 'FastAPI', 'React', 'TypeScript', 'PostgreSQL'],
+          location: 'San Francisco, CA / Remote',
+          remote: true,
+          pay_min: 120000,
+          pay_max: 160000,
+          currency: 'USD/yr',
+          deadline: new Date(Date.now() + 86400000 * 20).toISOString(),
+          posted_at: new Date().toISOString(),
+          url,
+          created_at: new Date().toISOString(),
+          status: 'active',
+        };
+        const all = JSON.parse(localStorage.getItem('sim_custom_opps') || '[]');
+        all.unshift(newOpp);
+        localStorage.setItem('sim_custom_opps', JSON.stringify(all));
+        return newOpp;
+      }
+    );
+  }
+
+  async createOpportunityFromText(text: string, sourceUrl?: string): Promise<Opportunity> {
+    return this.request(
+      '/opportunities/from-text',
+      {
+        method: 'POST',
+        body: JSON.stringify({ text, source_url: sourceUrl }),
+      },
+      async () => {
+        const lines = text.split('\n').filter((l) => l.trim().length > 0);
+        const title = lines[0] || 'Opportunity from Text';
+        const newOpp: Opportunity = {
+          id: 'opp_' + Math.random().toString(36).substring(2, 9),
+          source_id: 'src_manual',
+          source_name: 'Manual Text',
+          external_id: 'text_' + Date.now(),
+          type: 'job',
+          title: title.slice(0, 100),
+          org: 'Direct Entry',
+          description: text.slice(0, 3000),
+          skills: ['Software Engineering', 'Full-Stack'],
+          location: 'Remote',
+          remote: true,
+          posted_at: new Date().toISOString(),
+          url: sourceUrl || 'https://opportunityradar.app/manual',
+          created_at: new Date().toISOString(),
+          status: 'active',
+        };
+        const all = JSON.parse(localStorage.getItem('sim_custom_opps') || '[]');
+        all.unshift(newOpp);
+        localStorage.setItem('sim_custom_opps', JSON.stringify(all));
+        return newOpp;
+      }
+    );
+  }
+
+  private getSeededOpportunities(): Opportunity[] {
+    const custom: Opportunity[] = JSON.parse(localStorage.getItem('sim_custom_opps') || '[]');
+    const defaults: Opportunity[] = [
+      {
+        id: 'opp_remotive_1',
+        source_id: 'src_remotive',
+        source_name: 'Remotive',
+        external_id: 'remotive-98102',
+        type: 'internship',
+        title: 'Frontier AI Systems Intern (Winter / Spring)',
+        org: 'Anthropic Frontier Labs',
+        description: 'Collaborate with researchers and core system architects. Work on high-performance evaluation runners, agentic tool workflows, and telemetry for the Claude SDK.',
+        skills: ['Python', 'FastAPI', 'PyTorch', 'Claude SDK', 'Docker'],
+        location: 'San Francisco, CA / Remote',
+        remote: true,
+        pay_min: 55,
+        pay_max: 70,
+        currency: 'USD/hr',
+        deadline: new Date(Date.now() + 86400000 * 18).toISOString(),
+        posted_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+        url: 'https://remotive.com/jobs/ai-systems-intern',
+        created_at: new Date().toISOString(),
+        status: 'active',
+      },
+      {
+        id: 'opp_remoteok_1',
+        source_id: 'src_remoteok',
+        source_name: 'RemoteOK',
+        external_id: 'remoteok-8742',
+        type: 'freelance',
+        title: 'Full-Stack Contract: Opportunity Radar & AI Scraper System',
+        org: 'Autonomous Ventures Group',
+        description: 'Seeking a senior full-stack engineer to build an automated research radar with pgvector embeddings, APScheduler background jobs, and a clean mobile-ready PWA.',
+        skills: ['FastAPI', 'React', 'TypeScript', 'PostgreSQL', 'Docker', 'TailwindCSS'],
+        location: 'Global Remote',
+        remote: true,
+        pay_min: 7500,
+        pay_max: 12000,
+        currency: 'USD',
+        deadline: new Date(Date.now() + 86400000 * 9).toISOString(),
+        posted_at: new Date(Date.now() - 3600000 * 14).toISOString(),
+        url: 'https://remoteok.com/remote-jobs/8742',
+        created_at: new Date().toISOString(),
+        status: 'active',
+      },
+      {
+        id: 'opp_github_1',
+        source_id: 'src_github',
+        source_name: 'GitHub OSS',
+        external_id: 'github-issue-4412',
+        type: 'collaboration',
+        title: 'Open Agents Lab: Build Multi-Modal Tool Invocation Pipeline',
+        org: 'Open Agents Foundation',
+        description: 'Open source bounty & hackathon collaboration. Looking for core maintainers and contributors proficient in Python, async event loops, and LLM agent schemas.',
+        skills: ['Python', 'TypeScript', 'AI Agents', 'GraphQL'],
+        location: 'Remote / Global',
+        remote: true,
+        pay_min: 20000,
+        pay_max: 50000,
+        currency: 'USD Prize',
+        deadline: new Date(Date.now() + 86400000 * 12).toISOString(),
+        posted_at: new Date(Date.now() - 3600000 * 22).toISOString(),
+        url: 'https://github.com/open-agents/collab/issues/4412',
+        created_at: new Date().toISOString(),
+        status: 'active',
+      },
+      {
+        id: 'opp_hn_1',
+        source_id: 'src_hn',
+        source_name: 'HackerNews',
+        external_id: 'hn-comment-399120',
+        type: 'job',
+        title: 'Founding Software Engineer (Backend / Distributed Systems)',
+        org: 'RadarMind AI (YC W26)',
+        description: 'Founding engineer role building autonomous enterprise opportunity discovery. $2.5M seed raised. Looking for hands-on Python, PostgreSQL, and scalable API architecture expertise.',
+        skills: ['Python', 'FastAPI', 'PostgreSQL', 'pgvector', 'Redis'],
+        location: 'Remote / New York',
+        remote: true,
+        pay_min: 140000,
+        pay_max: 185000,
+        currency: 'USD/yr',
+        deadline: new Date(Date.now() + 86400000 * 32).toISOString(),
+        posted_at: new Date(Date.now() - 3600000 * 35).toISOString(),
+        url: 'https://news.ycombinator.com/item?id=399120',
+        created_at: new Date().toISOString(),
+        status: 'active',
+      },
+      {
+        id: 'opp_rss_1',
+        source_id: 'src_rss',
+        source_name: 'WeWorkRemotely',
+        external_id: 'wwr-rss-5521',
+        type: 'deal',
+        title: 'Enterprise AI Procurement: Radar Sourcing Platform RFP',
+        org: 'Global Innovation Hub',
+        description: 'Commercial enterprise deal / tender for building automated talent & opportunity matching engine with pgvector semantics and real-time alerts.',
+        skills: ['FastAPI', 'PostgreSQL', 'Cloud Infrastructure', 'Enterprise Security'],
+        location: 'Worldwide',
+        remote: true,
+        pay_min: 45000,
+        pay_max: 85000,
+        currency: 'USD Contract',
+        deadline: new Date(Date.now() + 86400000 * 6).toISOString(),
+        posted_at: new Date(Date.now() - 3600000 * 48).toISOString(),
+        url: 'https://weworkremotely.com/categories/remote-programming-jobs',
+        created_at: new Date().toISOString(),
+        status: 'active',
+      },
+    ];
+    return [...custom, ...defaults];
+  }
+
+  private simulateClaudeResumeParser(text: string): ExtractedResumeData {
     const lower = text.toLowerCase();
     const detectedSkills: string[] = [];
-
     const skillCatalog = [
       'Python', 'FastAPI', 'React', 'TypeScript', 'PostgreSQL', 'pgvector',
       'Docker', 'TailwindCSS', 'SQLAlchemy', 'Anthropic Claude SDK', 'PyTorch',
       'Machine Learning', 'GraphQL', 'Next.js', 'Git', 'Redis', 'Linux',
       'PWA', 'REST APIs', 'Node.js', 'APScheduler'
     ];
-
     for (const skill of skillCatalog) {
-      if (lower.includes(skill.toLowerCase())) {
-        detectedSkills.push(skill);
-      }
+      if (lower.includes(skill.toLowerCase())) detectedSkills.push(skill);
     }
-
     if (detectedSkills.length === 0) {
       detectedSkills.push('Python', 'FastAPI', 'React', 'TypeScript', 'PostgreSQL', 'Docker');
     }
-
-    let fullName = 'Alex Mercer';
-    if (lower.includes('john')) fullName = 'John Doe';
-    else if (lower.includes('sarah')) fullName = 'Sarah Connor';
-    else if (lower.includes('ekareks') || lower.includes('kare')) fullName = 'Eshaan Kare';
-
     return {
-      full_name: fullName,
+      full_name: 'Alex Mercer',
       headline: 'Full-Stack Engineer & AI Systems Developer',
       skills: detectedSkills,
       education: 'B.S. in Computer Science & Engineering, Expected 2026',
-      experience_summary: 'Experienced building distributed web applications, FastAPI backends, and responsive React PWAs. Developed intelligent data pipelines and vector-grounded workflows.',
+      experience_summary: 'Experienced building distributed web applications, FastAPI backends, and responsive React PWAs.',
       suggested_keywords: ['fastapi', 'react', 'python', 'ai agent', 'internship', 'remote', 'full-stack'],
       location: 'San Francisco, CA / Remote',
       extracted_text: text.slice(0, 2000),
-      extraction_source: 'Claude 3.5 Sonnet (via Anthropic Python SDK / App Engine)',
+      extraction_source: 'Claude 3.5 Sonnet (via Anthropic Python SDK)',
     };
   }
 }

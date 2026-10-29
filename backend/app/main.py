@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -5,9 +6,37 @@ import time
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
 from app.api.v1.router import api_router
+from app.db.session import SessionLocal
+from app.ingestion.registry import seed_sources
+from app.ingestion.scheduler import ingestion_scheduler
+from app.ingestion.http_client import http_client
 
 # Initialize structured logging
 setup_logging(debug=settings.DEBUG)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup actions
+    logger.info("[Opportunity Radar] Starting application lifecycle...")
+    db = SessionLocal()
+    try:
+        seed_sources(db)
+    except Exception as e:
+        logger.warning(f"Could not auto-seed sources on startup: {e}")
+    finally:
+        db.close()
+
+    # Start APScheduler
+    ingestion_scheduler.start()
+
+    yield
+
+    # Shutdown actions
+    logger.info("[Opportunity Radar] Shutting down application lifecycle...")
+    ingestion_scheduler.stop()
+    await http_client.close()
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -16,6 +45,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
+    lifespan=lifespan,
 )
 
 # Set up CORS

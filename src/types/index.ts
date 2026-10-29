@@ -46,6 +46,7 @@ export interface ExtractedResumeData {
 export interface Opportunity {
   id: string;
   source_id: string;
+  source_name?: string;
   external_id: string;
   type: OpportunityType;
   title: string;
@@ -61,6 +62,8 @@ export interface Opportunity {
   posted_at?: string;
   url: string;
   created_at: string;
+  duplicate_of_id?: string;
+  status: string;
 }
 
 export interface Match {
@@ -96,4 +99,39 @@ export interface NotificationItem {
   urgency: 'low' | 'medium' | 'high';
   read: boolean;
   created_at: string;
+}
+
+export interface SourceItem {
+  id: string;
+  name: string;
+  type: string;
+  enabled: boolean;
+  interval_hours: number;
+  config: Record<string, any>;
+  last_run_at?: string;
+  last_error?: string;
+  needs_config: boolean;
+  missing_env_keys: string[];
+}
+
+export interface IngestionRunItem {
+  id: string;
+  source_id: string;
+  source_name?: string;
+  status: string;
+  started_at: string;
+  finished_at?: string;
+  fetched: number;
+  new: number;
+  duplicates: number;
+  errors: string[];
+  tokens_used: number;
+}
+
+export interface OpportunityPaginated {
+  items: Opportunity[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
